@@ -1,0 +1,27 @@
+# Directories to index
+watch_paths:
+  - "D:/Study/College/CN"  #modify this
+
+# File extensions to include
+include_extensions:
+  - ".pdf"
+  - ".docx"
+  - ".txt"
+  - ".md"
+  - ".pptx"
+  - ".xlsx"
+  - ".py"
+  - ".js"
+  - ".ipynb"
+
+# Directories to skip
+skip_directories:
+  - ".git"
+  - "node_modules"
+  - "__pycache__"
+  - ".venv"
+
+# Where to store index data
+data_dir: "./data"
+
+embedding_model: "all-MiniLM-L6-v2"
