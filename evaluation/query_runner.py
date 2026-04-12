@@ -17,9 +17,19 @@ class QueryRunner:
 
     def _extract_doc_id(self, filepath: str) -> str:
         """
-        Convert "scifact://12345" back to doc_id "12345".
+        Strip dataset prefix from fake filepath so it matches qrels doc_ids.
+
+        Examples:
+            "scifact://12345"    →  "12345"
+            "nfcorpus://MED-10"  →  "MED-10"
+            "/real/file.pdf"     →  "/real/file.pdf"  (real files unchanged)
+
+        This is critical — without stripping, doc_ids like "nfcorpus://MED-10"
+        will never match qrels keys like "MED-10" and all scores will be 0.0
         """
-        return filepath.replace("scifact://", "")
+        if "://" in filepath:
+            return filepath.split("://", 1)[1]
+        return filepath
 
     def run(
         self,
@@ -34,17 +44,16 @@ class QueryRunner:
             queries — {query_id: query_text}
             top_k   — number of results per query (use 100 for eval)
             mode    — pipeline variant to test:
-                        "dense"   → dense retrieval only (no BM25, no reranker)
+                        "dense"   → dense retrieval only
                         "sparse"  → BM25 only
                         "hybrid"  → dense + BM25 + RRF (no reranker)
                         "full"    → complete pipeline with reranker
 
         Returns:
             dict — {query_id: [(doc_id, rank_score), ...]}
-                   rank_score is rrf_score or rerank_score depending on mode
         """
         results = {}
-        total = len(queries)
+        total   = len(queries)
 
         for i, (query_id, query_text) in enumerate(queries.items(), 1):
             if i % 50 == 0:
@@ -52,14 +61,14 @@ class QueryRunner:
 
             try:
                 if mode == "dense":
-                    raw = self.engine.dense_retriever.retrieve(query_text, top_k=top_k)
+                    raw    = self.engine.dense_retriever.retrieve(query_text, top_k=top_k)
                     ranked = [
                         (self._extract_doc_id(r["filepath"]), -r["dense_score"])
                         for r in raw
                     ]
 
                 elif mode == "sparse":
-                    raw = self.engine.sparse_retriever.retrieve(query_text, top_k=top_k)
+                    raw    = self.engine.sparse_retriever.retrieve(query_text, top_k=top_k)
                     ranked = [
                         (self._extract_doc_id(r["filepath"]), r["sparse_score"])
                         for r in raw
@@ -69,7 +78,7 @@ class QueryRunner:
                     dense_raw  = self.engine.dense_retriever.retrieve(query_text, top_k=top_k)
                     sparse_raw = self.engine.sparse_retriever.retrieve(query_text, top_k=top_k)
                     fused      = self.engine.fusion_ranker.fuse(dense_raw, sparse_raw, top_k=top_k)
-                    ranked = [
+                    ranked     = [
                         (self._extract_doc_id(r["filepath"]), r["rrf_score"])
                         for r in fused
                     ]
@@ -77,17 +86,25 @@ class QueryRunner:
                 else:  # full pipeline
                     output = self.engine.search(query_text, top_k=top_k)
                     ranked = [
-                        (self._extract_doc_id(r["filepath"]), r.get("rerank_score", r.get("rrf_score", 0)))
+                        (
+                            self._extract_doc_id(r["filepath"]),
+                            r.get("rerank_score", r.get("rrf_score", 0))
+                        )
                         for r in output["results"]
                     ]
 
-                # Deduplicate by doc_id (multiple chunks per doc → keep best score)
+                # Deduplicate by doc_id
+                # multiple chunks from same doc → keep only the best score
                 seen = {}
                 for doc_id, score in ranked:
                     if doc_id not in seen or score > seen[doc_id]:
                         seen[doc_id] = score
 
-                results[query_id] = sorted(seen.items(), key=lambda x: x[1], reverse=True)
+                results[query_id] = sorted(
+                    seen.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
 
             except Exception as e:
                 print(f"  Error on query {query_id}: {e}")

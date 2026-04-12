@@ -7,29 +7,38 @@ import os
 
 class DatasetLoader:
     """
-    Loads the SciFact dataset from the BEIR format.
+    Loads BEIR-format datasets (SciFact, NFCorpus, etc.)
 
-    BEIR format (same across all BEIR datasets):
-        corpus.jsonl  — one JSON per line: {_id, title, text}
-        queries.jsonl — one JSON per line: {_id, text}
-        qrels/test.tsv — TSV: query_id  doc_id  relevance_score (0 or 1)
+    BEIR format:
+        corpus.jsonl  — {_id, title, text}
+        queries.jsonl — {_id, text}
+        qrels/*.tsv   — query_id, doc_id, relevance_score
 
-    SciFact specifics:
-        - 5,183 scientific claim documents
-        - 300 test queries (scientific claims)
-        - Relevance: 1 = document supports/refutes the claim
+    Relevance scales:
+        SciFact  — binary (0 or 1)
+        NFCorpus — graded (0, 1, 2, 3)  → we keep anything >= 1
     """
 
     def __init__(self, dataset_path: str):
-        """
-        Args:
-            dataset_path — path to the scifact/ folder
-                           e.g. "data/scifact"
-        """
         self.dataset_path = dataset_path
         self.corpus_path  = os.path.join(dataset_path, "corpus.jsonl")
         self.queries_path = os.path.join(dataset_path, "queries.jsonl")
-        self.qrels_path   = os.path.join(dataset_path, "qrels", "test.tsv")
+
+        # qrels path — try test.tsv first, fallback to dev.tsv
+        # NFCorpus ships with dev.tsv instead of test.tsv
+        test_path = os.path.join(dataset_path, "qrels", "test.tsv")
+        dev_path  = os.path.join(dataset_path, "qrels", "dev.tsv")
+
+        if os.path.exists(test_path):
+            self.qrels_path = test_path
+        elif os.path.exists(dev_path):
+            self.qrels_path = dev_path
+            print(f"[INFO] test.tsv not found, using dev.tsv for qrels")
+        else:
+            raise FileNotFoundError(
+                f"No qrels file found in {os.path.join(dataset_path, 'qrels')} — "
+                f"expected test.tsv or dev.tsv"
+            )
 
     def load_corpus(self) -> dict:
         """
@@ -41,12 +50,11 @@ class DatasetLoader:
         corpus = {}
         with open(self.corpus_path, "r", encoding="utf-8") as f:
             for line in f:
-                doc = json.loads(line.strip())
+                doc    = json.loads(line.strip())
                 doc_id = str(doc["_id"])
-                # Combine title + text — same as how a real document would look
                 corpus[doc_id] = {
                     "title": doc.get("title", ""),
-                    "text":  doc.get("text", ""),
+                    "text":  doc.get("text",  ""),
                 }
         print(f"Loaded {len(corpus)} documents from corpus")
         return corpus
@@ -68,34 +76,57 @@ class DatasetLoader:
 
     def load_qrels(self) -> dict:
         """
-        Load relevance judgments from qrels/test.tsv.
+        Load relevance judgments from qrels file.
+
+        Handles both:
+            SciFact  — binary relevance (0 or 1)
+            NFCorpus — graded relevance (0, 1, 2, 3) → keep score >= 1
 
         Returns:
             dict — {query_id: {doc_id: relevance_score}}
-            relevance_score is 1 (relevant) or 0 (not relevant)
         """
         qrels = {}
+
         with open(self.qrels_path, "r", encoding="utf-8") as f:
             reader = csv.reader(f, delimiter="\t")
             next(reader)  # skip header: query-id  corpus-id  score
+
             for row in reader:
                 if len(row) < 3:
                     continue
-                query_id, doc_id, score = str(row[0]), str(row[1]), int(row[2])
+
+                query_id = str(row[0])
+                doc_id   = str(row[1])
+                score    = int(row[2])
+
+                # skip completely irrelevant docs
+                # this handles both binary (0/1) and graded (0/1/2/3)
+                if score < 1:
+                    continue
+
                 if query_id not in qrels:
                     qrels[query_id] = {}
+
                 qrels[query_id][doc_id] = score
-        print(f"Loaded qrels for {len(qrels)} queries")
+
+        print(f"Loaded qrels for {len(qrels)} queries "
+              f"from {os.path.basename(self.qrels_path)}")
         return qrels
 
 
 if __name__ == "__main__":
-    loader = DatasetLoader("data/scifact")
+    import sys
+
+    # pass dataset path as argument or default to scifact
+    # usage: python -m evaluation.dataset_loader data/nfcorpus
+    path   = sys.argv[1] if len(sys.argv) > 1 else "data/scifact"
+    loader = DatasetLoader(path)
+
     corpus  = loader.load_corpus()
     queries = loader.load_queries()
     qrels   = loader.load_qrels()
 
-    # Show a sample
+    # show a sample
     sample_qid = list(queries.keys())[0]
-    print(f"\nSample query [{sample_qid}]: {queries[sample_qid]}")
-    print(f"Relevant docs: {qrels.get(sample_qid, {})}")
+    print(f"\nSample query  [{sample_qid}]: {queries[sample_qid]}")
+    print(f"Relevant docs : {qrels.get(sample_qid, {})}")

@@ -14,39 +14,40 @@ class IndexerBridge:
     So we bypass the Crawler/Extractor and inject text directly into
     Chunker → Embedder → Store.
 
-    Each document gets a fake filepath: "scifact://{doc_id}"
+    Each document gets a fake filepath: "{dataset_name}://{doc_id}"
     This lets the Store treat them like any other indexed file,
     and the Evaluator can later match doc_id back from results.
     """
 
     def __init__(self, config_path: str = "config.yaml"):
-        self.chunker = Chunker(chunk_size=500, overlap=50)
+        self.chunker  = Chunker(chunk_size=500, overlap=50)
         self.embedder = Embedder(config_path)
         self.store    = Store(config_path)
 
-    def index_corpus(self, corpus: dict, batch_size: int = 64):
+    def index_corpus(self, corpus: dict, batch_size: int = 64, dataset_name: str = "dataset"):
         """
         Index the entire corpus into FAISS + SQLite.
 
         Args:
-            corpus     — {doc_id: {"title": str, "text": str}}
-            batch_size — number of chunks to embed at once (memory control)
+            corpus       — {doc_id: {"title": str, "text": str}}
+            batch_size   — number of chunks to embed at once (memory control)
+            dataset_name — used as prefix for fake file paths e.g. "scifact", "nfcorpus"
         """
         doc_ids = list(corpus.keys())
         total   = len(doc_ids)
-        print(f"Indexing {total} documents...")
+        print(f"Indexing {total} documents from [{dataset_name}]...")
 
-        # Clear any previous SciFact index entries
-        # (safe to run multiple times)
-        existing_hashes = self.store.load_hashes()
-        scifact_files   = [fp for fp in existing_hashes if fp.startswith("scifact://")]
-        for fp in scifact_files:
+        # Clear previous entries for THIS dataset only
+        existing_hashes  = self.store.load_hashes()
+        prefix           = f"{dataset_name}://"
+        existing_entries = [fp for fp in existing_hashes if fp.startswith(prefix)]
+        for fp in existing_entries:
             self.store.remove_file_chunks(fp)
-        if scifact_files:
-            print(f"Cleared {len(scifact_files)} previously indexed documents")
+        if existing_entries:
+            print(f"Cleared {len(existing_entries)} previously indexed [{dataset_name}] documents")
 
-        chunk_buffer   = []   # list of chunk dicts
-        text_buffer    = []   # list of chunk texts for batch embedding
+        chunk_buffer = []
+        text_buffer  = []
 
         def flush(chunk_buffer, text_buffer):
             if not chunk_buffer:
@@ -56,24 +57,20 @@ class IndexerBridge:
             self.store.add_chunks(chunk_buffer, embeddings)
 
         for i, doc_id in enumerate(doc_ids, 1):
-            doc = corpus[doc_id]
-            # Combine title and body — title is often the key claim
+            doc       = corpus[doc_id]
             full_text = f"{doc['title']} {doc['text']}".strip()
             if not full_text:
                 continue
 
-            # Use scifact://doc_id as the fake filepath
-            fake_path = f"scifact://{doc_id}"
+            fake_path = f"{prefix}{doc_id}"
             chunks    = self.chunker.chunk_file(full_text, fake_path)
 
             for chunk in chunks:
                 chunk_buffer.append(chunk)
                 text_buffer.append(chunk["text"])
 
-            # Save file-level info (hash = doc_id for reproducibility)
             self.store.save_file_info(fake_path, doc_id, len(chunks))
 
-            # Flush every batch_size documents
             if len(chunk_buffer) >= batch_size:
                 flush(chunk_buffer, text_buffer)
                 chunk_buffer.clear()
@@ -82,7 +79,7 @@ class IndexerBridge:
             if i % 500 == 0:
                 print(f"  Indexed {i}/{total}...")
 
-        # Flush remainder
+        # flush any remaining chunks
         flush(chunk_buffer, text_buffer)
         print(f"Done. Total vectors: {self.store.get_total_vectors()}")
 
@@ -94,4 +91,4 @@ if __name__ == "__main__":
     corpus = loader.load_corpus()
 
     bridge = IndexerBridge()
-    bridge.index_corpus(corpus, batch_size=64)
+    bridge.index_corpus(corpus, batch_size=64, dataset_name="scifact")
