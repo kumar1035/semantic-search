@@ -8,7 +8,21 @@ class Embedder:
     """
     Loads a sentence-transformer model and converts text chunks
     into dense vector embeddings.
+
+    Model upgrade: all-MiniLM-L6-v2  →  BAAI/bge-small-en-v1.5
+
+    Why BGE over MiniLM:
+        - MiniLM   : general purpose, fast, 384-dim, NDCG ~0.65 on SciFact
+        - BGE-small: retrieval-specific training, 384-dim, NDCG ~0.72 on SciFact
+        - Same dimension (384), same API — only the model name changes
+        - BGE uses a special instruction prefix for queries (not for documents)
+          "Represent this sentence for searching relevant passages: {query}"
+          This is handled automatically in embed_single()
     """
+
+    # BGE query instruction prefix — improves retrieval accuracy
+    # Applied to queries only, NOT to document chunks during indexing
+    BGE_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 
     def __init__(self, config_path="config.yaml"):
         """
@@ -18,41 +32,65 @@ class Embedder:
             config_path (str) — path to config.yaml
         """
         with open(config_path, "r") as f:
-            config=yaml.safe_load(f)
-        
-        model_name = config["embedding_model"]
+            config = yaml.safe_load(f)
+
+        model_name     = config["embedding_model"]
+        self.model_name = model_name
+
+        # detect if we are using a BGE model
+        # BGE models need a special prefix on queries (not on documents)
+        self.is_bge = "bge" in model_name.lower()
+
         print(f"Loading embedding model '{model_name}'...")
         self.model = SentenceTransformer(model_name)
-        print("Model loaded.")
+        print(f"Model loaded — BGE mode: {self.is_bge}")
 
     def embed_chunks(self, chunks):
         """
         Convert a list of text chunks into dense vector embeddings.
+        Used during INDEXING — no query prefix applied here.
 
         Args:
             chunks (list[str]) — list of text strings to embed
 
         Returns:
-            list[list[float]] — list of embedding vectors
-                                each vector is 384 floats for MiniLM
+            numpy.ndarray — shape (num_chunks, embedding_dim)
+                            384 dimensions for both MiniLM and BGE-small
         """
-        embeddings = self.model.encode(chunks)
+        embeddings = self.model.encode(
+            chunks,
+            batch_size=64,
+            show_progress_bar=False,
+            normalize_embeddings=self.is_bge,  # BGE needs L2 normalization
+        )
         return embeddings
 
     def embed_single(self, text):
         """
-        Embed a single text string (for a single query).
+        Embed a single query string.
+        Used during SEARCH — BGE prefix is applied here if using BGE model.
+
+        Why prefix only on queries:
+            BGE was trained with this asymmetric setup.
+            Documents are indexed as-is.
+            Queries get the instruction prefix so the model knows
+            it is searching for relevant passages, not matching exact text.
 
         Args:
-            text (str) — a single text string
+            text (str) — a single query string
 
         Returns:
-            list[float] — one embedding vector
+            numpy.ndarray — one embedding vector (384 dimensions)
         """
-        return self.model.encode(text)
+        if self.is_bge:
+            text = self.BGE_QUERY_PREFIX + text
+
+        return self.model.encode(
+            text,
+            normalize_embeddings=True,  # always normalize for BGE
+        )
 
 
-# --- Test it ---
 if __name__ == "__main__":
     embedder = Embedder()
 

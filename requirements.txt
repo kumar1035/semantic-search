@@ -54,3 +54,7 @@ rank-bm25     # optional, but our SparseRetriever is self-contained
 fastapi       # phase 4 API
 uvicorn       # phase 4 API server
 typer         # phase 4 CLI
+fastapi
+uvicorn
+jinja2
+python-multipart

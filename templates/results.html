@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results — {{ query }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav>
+    <a href="/" class="brand">🔍 Semantic Search</a>
+    <a href="/">Search</a>
+    <a href="/dashboard">Dashboard</a>
+</nav>
+
+<div class="container">
+
+    <!-- search bar stays on results page -->
+    <div class="search-card" style="margin-top:1.5rem; max-width:100%;">
+        <form action="/search" method="post">
+            <div class="search-row">
+                <input
+                    class="search-input"
+                    type="text"
+                    name="query"
+                    value="{{ query }}"
+                    required
+                />
+                <button class="btn-search" type="submit">Search</button>
+            </div>
+            <div class="filters">
+                <label>Top results:</label>
+                <select name="top_k">
+                    <option value="5"  {% if top_k==5  %}selected{% endif %}>5</option>
+                    <option value="10" {% if top_k==10 %}selected{% endif %}>10</option>
+                    <option value="20" {% if top_k==20 %}selected{% endif %}>20</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <div class="results-layout">
+
+        <!-- LEFT — ranked results -->
+        <div>
+            <div class="results-header">
+                <h2>Results for "{{ query }}"</h2>
+                <div class="results-meta">
+                    {{ total }} result{{ "s" if total != 1 else "" }}
+                    &nbsp;·&nbsp; {{ elapsed }}s
+                    &nbsp;·&nbsp; Full pipeline
+                </div>
+            </div>
+
+            {% if expanded_query and expanded_query != query %}
+            <div class="expanded-tag">
+                <strong>Expanded:</strong> {{ expanded_query }}
+            </div>
+            {% endif %}
+
+            {% if results %}
+                {% for r in results %}
+                <div class="result-card">
+                    <div class="result-top">
+                        <div class="result-title">
+                            {{ r.icon }}&nbsp; {{ r.doc_id }}
+                        </div>
+                        <div class="result-score">{{ r.score }}</div>
+                    </div>
+
+                    <div class="result-snippet">{{ r.snippet }}</div>
+
+                    <div class="result-footer">
+                        {% if r.dataset == "scifact" %}
+                            <span class="badge badge-scifact">🔬 SciFact</span>
+                        {% elif r.dataset == "nfcorpus" %}
+                            <span class="badge badge-nfcorpus">🏥 NFCorpus</span>
+                        {% else %}
+                            <span class="badge badge-file">📁 File</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+
+            {% else %}
+                <div class="no-results">
+                    <p>No results found for "<strong>{{ query }}</strong>"</p>
+                    <p style="margin-top:0.5rem; font-size:0.85rem; color:#bbb;">
+                        Try shorter or different keywords.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- RIGHT — matched dataset queries -->
+        <div>
+
+            <!-- SciFact panel -->
+            <div class="query-panel">
+                <div class="panel-header scifact">
+                    🔬 SciFact Queries
+                    <span class="panel-count">{{ scifact_matches | length }}</span>
+                </div>
+                {% if scifact_matches %}
+                    {% for q in scifact_matches %}
+                    <div class="query-item">
+                        <div class="query-id">Query #{{ q.query_id }}</div>
+                        <div class="query-text">{{ q.query_text }}</div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="panel-empty">
+                        No SciFact queries matched "{{ query }}"
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- NFCorpus panel -->
+            <div class="query-panel">
+                <div class="panel-header nfcorpus">
+                    🏥 NFCorpus Queries
+                    <span class="panel-count">{{ nfcorpus_matches | length }}</span>
+                </div>
+                {% if nfcorpus_matches %}
+                    {% for q in nfcorpus_matches %}
+                    <div class="query-item">
+                        <div class="query-id">Query #{{ q.query_id }}</div>
+                        <div class="query-text">{{ q.query_text }}</div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="panel-empty">
+                        No NFCorpus queries matched "{{ query }}"
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- info box -->
+            <div class="panel-info">
+                These are actual evaluation queries from the BEIR benchmark
+                that share keywords with your search.
+                <br><br>
+                <strong>300</strong> SciFact queries &nbsp;·&nbsp;
+                <strong>323</strong> NFCorpus queries loaded.
+            </div>
+
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

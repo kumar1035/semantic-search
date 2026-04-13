@@ -36,5 +36,6 @@ skip_directories:
 data_dir: "./data"
 
 embedding_model: "all-MiniLM-L6-v2"
+# embedding_model: BAAI/bge-small-en-v1.5
 
 debounce_seconds: 5

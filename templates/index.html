@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Search Engine</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav>
+    <a href="/" class="brand">🔍 Semantic Search</a>
+    <a href="/">Search</a>
+    <a href="/dashboard">Dashboard</a>
+</nav>
+
+<div class="container">
+    <div class="hero">
+        <h1>Semantic File Search Engine</h1>
+        <p>AI-powered search across SciFact and NFCorpus using Dense + BM25 + RRF + Cross-Encoder</p>
+
+        <div class="stats">
+            <span class="stat-pill">🔬 SciFact — {{ scifact_count }} queries</span>
+            <span class="stat-pill">🏥 NFCorpus — {{ nfcorpus_count }} queries</span>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="error-box">{{ error }}</div>
+    {% endif %}
+
+    <div class="search-card">
+        <form action="/search" method="post">
+            <div class="search-row">
+                <input
+                    class="search-input"
+                    type="text"
+                    name="query"
+                    placeholder="e.g. vitamin D deficiency cancer risk"
+                    autofocus
+                    required
+                />
+                <button class="btn-search" type="submit">Search</button>
+            </div>
+            <div class="filters">
+                <label>Top results:</label>
+                <select name="top_k">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <div class="sample-queries">
+        <p>Try a sample query:</p>
+        {% for q in [
+            "vitamin D cancer",
+            "BRCA1 breast cancer",
+            "smoking lung disease",
+            "mRNA vaccine immune",
+            "diabetes insulin resistance",
+            "protein folding structure"
+        ] %}
+        <button class="sample-btn"
+            onclick="document.querySelector('.search-input').value='{{ q }}'">
+            {{ q }}
+        </button>
+        {% endfor %}
+    </div>
+</div>
+
+</body>
+</html>

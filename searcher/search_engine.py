@@ -80,6 +80,10 @@ class SearchEngine:
         # Step 1 — query understanding
         query_info = self.query_understanding.process(query)
 
+        query_info.setdefault("original", query)
+        query_info.setdefault("expanded", query)
+        query_info.setdefault("rewritten", query)
+
         # Step 2 — dense retrieval (uses expanded query for better semantic reach)
         dense_results = self.dense_retriever.retrieve(
             query_info["expanded"], top_k=self.candidate_k
@@ -112,10 +116,13 @@ class SearchEngine:
 
         # Step 7 — highlight previews
         final = self.highlighter.annotate(final, query_info["original"])
+        for r in final:
+            if "preview" not in r or not r["preview"]:
+                r["preview"] = r.get("chunk_text", "")[:200]
 
         return {
             "query_info": query_info,
-            "results": final,
+            "results": final or [],
         }
 
 if __name__ == "__main__":

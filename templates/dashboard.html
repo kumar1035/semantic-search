@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluation Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav>
+    <a href="/" class="brand">🔍 Semantic Search</a>
+    <a href="/">Search</a>
+    <a href="/dashboard">Dashboard</a>
+</nav>
+
+<div class="container">
+
+    <div style="margin-top:1.5rem;">
+        <div class="dash-title">Evaluation Dashboard</div>
+        <div class="dash-sub">
+            BEIR Benchmark — Full pipeline (Dense + BM25 + RRF + Cross-Encoder)
+        </div>
+    </div>
+
+    {% if datasets %}
+
+    <!-- metric cards -->
+    <div class="dash-grid">
+        {% for d in datasets %}
+        <div class="metric-card">
+            <h3>
+                {% if d.name == "scifact" %}🔬{% else %}🏥{% endif %}
+                {{ d.name | title }}
+                <span style="font-size:0.76rem;color:#999;font-weight:400;">
+                    — {{ d.queries }} queries
+                </span>
+            </h3>
+
+            <div class="metric-row">
+                <span class="metric-label">NDCG@10</span>
+                <div class="bar-wrap">
+                    <div class="bar green" style="width:{{ (d.ndcg * 100) | round(1) }}%"></div>
+                </div>
+                <span class="metric-val">{{ "%.4f" | format(d.ndcg) }}</span>
+            </div>
+
+            <div class="metric-row">
+                <span class="metric-label">MRR</span>
+                <div class="bar-wrap">
+                    <div class="bar" style="width:{{ (d.mrr * 100) | round(1) }}%"></div>
+                </div>
+                <span class="metric-val">{{ "%.4f" | format(d.mrr) }}</span>
+            </div>
+
+            <div class="metric-row">
+                <span class="metric-label">MAP@100</span>
+                <div class="bar-wrap">
+                    <div class="bar amber" style="width:{{ (d.map * 100) | round(1) }}%"></div>
+                </div>
+                <span class="metric-val">{{ "%.4f" | format(d.map) }}</span>
+            </div>
+
+            <div class="metric-row">
+                <span class="metric-label">Recall@100</span>
+                <div class="bar-wrap">
+                    <div class="bar" style="width:{{ (d.recall * 100) | round(1) }}%"></div>
+                </div>
+                <span class="metric-val">{{ "%.4f" | format(d.recall) }}</span>
+            </div>
+
+            <div class="metric-row">
+                <span class="metric-label">P@10</span>
+                <div class="bar-wrap">
+                    <div class="bar amber" style="width:{{ (d.precision * 100) | round(1) }}%"></div>
+                </div>
+                <span class="metric-val">{{ "%.4f" | format(d.precision) }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- ablation tables -->
+    {% for d in datasets %}
+    <div class="section-label">
+        Ablation Table — {{ d.name | title }}
+    </div>
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Mode</th>
+                    <th>NDCG@10</th>
+                    <th>MAP@100</th>
+                    <th>MRR</th>
+                    <th>Recall@100</th>
+                    <th>P@10</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mode_name, m in d.modes.items() %}
+                <tr {% if mode_name == "full" %}class="best"{% endif %}>
+                    <td>{{ mode_name }}</td>
+                    <td>{{ "%.4f" | format(m.get("NDCG@10",    0)) }}</td>
+                    <td>{{ "%.4f" | format(m.get("MAP@100",    0)) }}</td>
+                    <td>{{ "%.4f" | format(m.get("MRR",        0)) }}</td>
+                    <td>{{ "%.4f" | format(m.get("Recall@100", 0)) }}</td>
+                    <td>{{ "%.4f" | format(m.get("P@10",       0)) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <div class="no-results">
+        <p>No evaluation results found.</p>
+        <p style="margin-top:0.5rem;font-size:0.85rem;">
+            Run:
+            <code>python -m evaluation.run_eval --datasets scifact nfcorpus --mode all</code>
+        </p>
+    </div>
+    {% endif %}
+
+</div>
+</body>
+</html>
