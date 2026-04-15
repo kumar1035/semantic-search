@@ -56,5 +56,6 @@ uvicorn       # phase 4 API server
 typer         # phase 4 CLI
 fastapi
 uvicorn
+gunicorn
 jinja2
 python-multipart
