@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "Read(/C:\\Users\\kumar\\Desktop\\semantic search\\semantic-search/**)",
+      "Read(/C:\\Users\\kumar\\Desktop\\semantic search\\semantic-search/**)",
       "Read(/C:\\Users\\kumar\\Desktop\\semantic search\\semantic-search/**)"
     ],
     "deny": [],
