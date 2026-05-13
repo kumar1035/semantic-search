@@ -134,7 +134,7 @@ project/
 ## Clone the Repository
 
 ```bash
-git clone <repository-link>
+git clone https://github.com/kumar1035/semantic-search.git
 cd project-name
 ```
 
