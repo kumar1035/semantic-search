@@ -163,10 +163,9 @@ def find_matching_dataset_queries(
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse("index.html", {
-        "request":          request,
-        "scifact_count":    len(DATASET_QUERIES.get("scifact",  {})),
-        "nfcorpus_count":   len(DATASET_QUERIES.get("nfcorpus", {})),
+    return templates.TemplateResponse(request, "index.html", {
+        "scifact_count":  len(DATASET_QUERIES.get("scifact",  {})),
+        "nfcorpus_count": len(DATASET_QUERIES.get("nfcorpus", {})),
     })
 
 
@@ -178,9 +177,8 @@ async def search(
     mode:    str = Form("full"),
 ):
     if not query.strip():
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "error":   "Please enter a search query.",
+        return templates.TemplateResponse(request, "index.html", {
+            "error": "Please enter a search query.",
         })
 
     t0      = time.time()
@@ -216,17 +214,16 @@ async def search(
     matched_scifact  = [q for q in matched_queries if q["dataset"] == "scifact"]
     matched_nfcorpus = [q for q in matched_queries if q["dataset"] == "nfcorpus"]
 
-    return templates.TemplateResponse("results.html", {
-        "request":          request,
-        "query":            query,
-        "results":          results,
-        "total":            len(results),
-        "elapsed":          elapsed,
-        "mode":             mode,
-        "top_k":            top_k,
+    return templates.TemplateResponse(request, "results.html", {
+        "query":           query,
+        "results":         results,
+        "total":           len(results),
+        "elapsed":         elapsed,
+        "mode":            mode,
+        "top_k":           top_k,
         "matched_scifact":  matched_scifact,
         "matched_nfcorpus": matched_nfcorpus,
-        "total_matched":    len(matched_queries),
+        "total_matched":   len(matched_queries),
     })
 
 
@@ -248,8 +245,7 @@ async def dashboard(request: Request):
             "modes":     mode_results,
         })
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request":  request,
+    return templates.TemplateResponse(request, "dashboard.html", {
         "datasets": datasets,
     })
 
